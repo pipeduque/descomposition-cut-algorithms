@@ -2,173 +2,17 @@ import matplotlib.pyplot as plt
 from scipy.stats import wasserstein_distance
 import numpy as np
 import networkx as nx
-
-states = [
-    [0, 0, 0],
-    [1, 0, 0],
-    [0, 1, 0],
-    [1, 1, 0],
-    [0, 0, 1],
-    [1, 0, 1],
-    [0, 1, 1],
-    [1, 1, 1],
-]
-
-probabilities = [
-    [1, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 1, 0, 0, 0],
-    [0, 0, 0, 0, 0, 1, 0, 0],
-    [0, 1, 0, 0, 0, 0, 0, 0],
-    [0, 1, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 1],
-    [0, 0, 0, 0, 0, 1, 0, 0],
-    [0, 0, 0, 1, 0, 0, 0, 0],
-]
-
-
-def reorder_cross_product(cross_product):
-    len_cross = len(cross_product)
-
-    if len_cross == 4:
-        new_order = [0, 2, 1, 3]
-        return cross_product[new_order]
-
-    elif len_cross == 8:
-        new_order = [0, 1, 2, 3, 4, 6, 5, 7]
-        return cross_product[new_order]
-
-    return cross_product
-
-
-def ns_to_array(letras):
-    ns_arr = [0] * len(letras)
-
-    return ns_arr
-
-
-def cs_to_array(cs):
-    # Crear un nuevo arreglo con None en las posiciones especificadas por cs
-    cs_arr = [cs_value[i] if chr(65 + i) in cs else None for i in range(len(cs_value))]
-
-    return cs_arr
-
-
-def build_probabilities(probabilities, len_cs):
-    extended_probabilities = [None] * len(probabilities)
-    for i in range(len(probabilities)):
-        extended_probabilities[i] = probabilities[i] + [0] * (
-            len_cs - len(probabilities[i])
-        )
-
-    return extended_probabilities
-
-
-def graphProbability(array, color, label):
-    labels = [bin(i)[2:] for i in range(len(array))]
-    positions = np.arange(len(labels))
-    plt.bar(positions, array, color=color, alpha=0.7, label=label)
-    for i, valor in enumerate(array):
-        plt.text(i, valor + 0.05, f"{valor:.2f}", ha="center", va="bottom")
-    plt.xlabel("Next state")
-    plt.ylabel("Probability")
-    plt.xticks(positions, labels)
-    plt.legend()
-    plt.ylim(0, 1)
-    plt.show()
-
-
-def getIndicesToMargenalice(states, state):
-    availableIndices = []
-    indices = {}
-    csValue = ""
-
-    for i in range(len(state)):
-        if state[i] != None:
-            availableIndices.append(i)
-            csValue = str(state[i]) + csValue
-
-    for i in range(len(states)):
-        key = ""
-        for j in range(len(availableIndices)):
-            key += str(states[i][availableIndices[j]])
-
-        indices[key] = indices.get(key) + [i] if indices.get(key) else [i]
-
-    if csValue == "":
-        return indices, 0
-
-    return indices, int(csValue, 2)
-
-
-def margenaliceNextState(nsIndices, probabilites):
-    nsTransitionTable = [[None] * len(nsIndices) for i in range(len(probabilites))]
-    currentColumn = 0
-    for indices in nsIndices.values():
-        for i in range(len(nsTransitionTable)):
-            probability = 0
-            for j in range(len(indices)):
-                probability += probabilites[i][indices[j]]
-
-            nsTransitionTable[i][currentColumn] = probability
-
-        currentColumn += 1
-
-    return nsTransitionTable
-
-
-def margenaliceCurrentState(csIndices, nsTransitionTable):
-    csTransitionTable = [
-        [None] * len(nsTransitionTable[0]) for i in range(len(csIndices))
-    ]
-
-    currentRow = 0
-    for indices in csIndices.values():
-        for i in range(len(csTransitionTable[0])):
-            probability = 0
-            for j in range(len(indices)):
-                probability += nsTransitionTable[indices[j]][i]
-
-            csTransitionTable[currentRow][i] = probability / len(indices)
-
-        currentRow += 1
-
-    return csTransitionTable
-
-
-def probabilityTransitionTable(currentState, nextState, probabilities):
-    result = []
-    csTransitionTable = []
-    csIndices, csValueIndex = getIndicesToMargenalice(states, currentState)
-    missingCs = any(state is None for state in currentState)
-
-    if missingCs:
-        for i, state in enumerate(nextState):
-            if state is not None:
-                newNs = [None] * len(nextState)
-                newNs[i] = nextState[i]
-
-                nsIndices, _ = getIndicesToMargenalice(states, newNs)
-                nsTransitionTable = margenaliceNextState(nsIndices, probabilities)
-                csTransitionTable = margenaliceCurrentState(
-                    csIndices, nsTransitionTable
-                )
-                csValue = csTransitionTable[csValueIndex]
-
-                if len(result) > 0:
-                    result = np.kron(result, csValue)
-                else:
-                    result = csValue
-
-        # result = reorder_cross_product(result)
-
-    else:
-        nsIndices, _ = getIndicesToMargenalice(states, nextState)
-        nsTransitionTable = margenaliceNextState(nsIndices, probabilities)
-
-        csTransitionTable = margenaliceCurrentState(csIndices, nsTransitionTable)
-        result = csTransitionTable[csValueIndex]
-
-    return result
+from scipy.stats import wasserstein_distance
+from controllers.ProbabilityTransitionController import (
+    probabilityTransitionTable,
+    graphProbability,
+)
+from controllers.Helpers import (
+    cs_to_array,
+    ns_to_array,
+    reorder_cross_product,
+    build_probabilities,
+)
 
 
 def dfs(G, node, visited, end_node):
@@ -235,7 +79,7 @@ def start_process(G, ns, cs, cs_value, min_partition, probabilities, states):
     memory = {}
     probabilities = build_probabilities(probabilities, len(states))
     original_system = probabilityTransitionTable(
-        cs_to_array(cs), ns_to_array(ns), probabilities
+        cs_to_array(cs, cs_value), ns_to_array(ns), probabilities, states
     )
 
     for i in range(len(ns)):
@@ -261,8 +105,10 @@ def start_process(G, ns, cs, cs_value, min_partition, probabilities, states):
             G.remove_edge(nsN, csC)
             draw_graph(G)
 
-            arr1 = np.array(cut("", csC, memory, probabilities))
-            arr2 = np.array(cut(ns, cs_right_partition, memory, probabilities))
+            arr1 = np.array(cut("", csC, cs_value, memory, probabilities, states))
+            arr2 = np.array(
+                cut(ns, cs_right_partition, cs_value, memory, probabilities, states)
+            )
 
             partitioned_system = []
 
@@ -345,25 +191,27 @@ def set_min_partition(
     min_partition["edge_to_remove_2"] = edge_to_remove_2
 
 
-def cut(ns, cs, memory, probabilities):
+def cut(ns, cs, cs_value, memory, probabilities, states):
     if memory.get(cs) is not None and memory.get(cs).get(ns) is not None:
         if any(memory.get(cs).get(ns)):
             return memory.get(cs).get(ns)
 
     if len(ns) == 1:
         value = probabilityTransitionTable(
-            cs_to_array(cs), ns_to_array(ns), probabilities
+            cs_to_array(cs, cs_value), ns_to_array(ns), probabilities, states
         )
         return value
 
     value = []
     for i in range(0, len(ns)):
         if len(value) > 0:
-            cross_product = np.kron(value, cut(ns[i], cs, memory, probabilities))
+            cross_product = np.kron(
+                value, cut(ns[i], cs, cs_value, memory, probabilities, states)
+            )
             value = reorder_cross_product(cross_product)
 
         else:
-            value = np.array(cut(ns[i], cs, memory, probabilities))
+            value = np.array(cut(ns[i], cs, cs_value, memory, probabilities, states))
 
             if memory.get(cs) == None:
                 memory[cs] = {}
@@ -401,33 +249,3 @@ def draw_graph(G):
         arrowsize=20,
     )
     plt.show()
-
-
-states = [
-    [0, 0, 0],
-    [1, 0, 0],
-    [0, 1, 0],
-    [1, 1, 0],
-    [0, 0, 1],
-    [1, 0, 1],
-    [0, 1, 1],
-    [1, 1, 1],
-]
-
-probabilities = [
-    [1, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 1, 0, 0, 0],
-    [0, 0, 0, 0, 0, 1, 0, 0],
-    [0, 1, 0, 0, 0, 0, 0, 0],
-    [0, 1, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 1],
-    [0, 0, 0, 0, 0, 1, 0, 0],
-    [0, 0, 0, 1, 0, 0, 0, 0],
-]
-
-# Ejemplo 1 cut conexions
-ns = "AB"
-cs = "ABC"
-cs_value = [1, 0, 0]
-
-cut_process(ns, cs, cs_value, probabilities, states)
