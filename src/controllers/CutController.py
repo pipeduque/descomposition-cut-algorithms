@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 from scipy.stats import wasserstein_distance
 import numpy as np
 import networkx as nx
-from scipy.stats import wasserstein_distance
 from controllers.ProbabilityTransitionController import (
     probabilityTransitionTable,
     graphProbability,
